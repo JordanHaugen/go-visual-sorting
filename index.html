@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sorting Visualization</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen">
+    <div class="text-center mb-4">
+        <h1 class="font-bold text-2xl">Sorting Visualization</h1>
+        <p class="text-gray-700">Bubble Sort Algorithm</p>
+    </div>
+    
+    <div id="array" class="flex justify-center mb-4"></div>
+    
+    <button onclick="startSort()" class="px-6 py-2 bg-blue-500 text-white rounded hover:bg-blue-700 transition-colors">
+        Sort
+    </button>
+
+    <script>
+        let arr = Array.from({length: 30}, () => Math.floor(Math.random() * 100));
+        const arrayContainer = document.getElementById('array');
+        displayArray(arr);
+
+        function displayArray(arr) {
+            arrayContainer.innerHTML = '';
+            arr.forEach(value => {
+                const bar = document.createElement('div');
+                bar.style.height = `${value * 3}px`;
+                bar.classList.add('bar', 'bg-blue-500', 'mx-0.5', 'w-4');
+                arrayContainer.appendChild(bar);
+            });
+        }
+
+        function startSort() {
+            fetch('/sort', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(arr),
+            })
+            .then(response => response.json())
+            .then(sortedArray => {
+                arr = sortedArray;
+                displayArray(arr);
+            })
+            .catch(error => console.error('Error:', error));
+        }
+    </script>
+</body>
+</html>
