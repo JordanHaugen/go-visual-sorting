@@ -2,8 +2,17 @@ package main
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
+
+	"github.com/gorilla/websocket"
 )
+
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+		return true
+	},
+}
 
 func bubbleSort(arr []int) {
 	n := len(arr)
@@ -16,28 +25,85 @@ func bubbleSort(arr []int) {
 	}
 }
 
-func sortHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" {
-		http.Error(w, "Only POST method is allowed", http.StatusMethodNotAllowed)
+func selectionSort(arr []int) {
+	n := len(arr)
+	for i := 0; i < n; i++ {
+		minIdx := i
+		for j := i + 1; j < n; j++ {
+			if arr[j] < arr[minIdx] {
+				minIdx = j
+			}
+		}
+		arr[i], arr[minIdx] = arr[minIdx], arr[i]
+	}
+}
+
+func insertionSort(arr []int) {
+	for i := 1; i < len(arr); i++ {
+		key := arr[i]
+		j := i - 1
+		for j >= 0 && arr[j] > key {
+			arr[j+1] = arr[j]
+			j = j - 1
+		}
+		arr[j+1] = key
+	}
+}
+
+// WebSocket endpoint for handling real-time sorting
+func wsEndpoint(w http.ResponseWriter, r *http.Request) {
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Println("Upgrade:", err)
 		return
 	}
+	defer conn.Close()
 
-	var arr []int
-	if err := json.NewDecoder(r.Body).Decode(&arr); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
+	for {
+		_, msg, err := conn.ReadMessage()
+		if err != nil {
+			log.Println("ReadMessage:", err)
+			break
+		}
+
+		var request struct {
+			Array     []int  `json:"array"`
+			Algorithm string `json:"algorithm"`
+		}
+
+		if err := json.Unmarshal(msg, &request); err != nil {
+			log.Println("Unmarshal:", err)
+			continue
+		}
+
+		// Choose the sorting algorithm based on the request
+		switch request.Algorithm {
+		case "bubble":
+			bubbleSort(request.Array)
+		case "selection":
+			selectionSort(request.Array)
+		case "insertion":
+			insertionSort(request.Array)
+		default:
+			log.Println("Invalid algorithm specified")
+			continue
+		}
+
+		// Send the sorted array back through the WebSocket
+		if err := conn.WriteJSON(request.Array); err != nil {
+			log.Println("WriteJSON:", err)
+			break
+		}
 	}
-
-	bubbleSort(arr)
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(arr)
 }
 
 func main() {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		http.ServeFile(w, r, "index.html")
 	})
-	http.HandleFunc("/sort", sortHandler)
-	http.ListenAndServe(":8080", nil)
+	http.HandleFunc("/ws", wsEndpoint) // Set up WebSocket route
+	log.Println("Server started on :8080")
+	if err := http.ListenAndServe(":8080", nil); err != nil {
+		log.Fatal("ListenAndServe:", err)
+	}
 }

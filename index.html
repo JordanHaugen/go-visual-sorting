@@ -9,20 +9,57 @@
 <body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen">
     <div class="text-center mb-4">
         <h1 class="font-bold text-2xl">Sorting Visualization</h1>
-        <p class="text-gray-700">Bubble Sort Algorithm</p>
+        <p class="text-gray-700">Choose an algorithm and see it in action!</p>
     </div>
     
     <div id="array" class="flex justify-center mb-4"></div>
     
-    <button onclick="startSort()" class="px-6 py-2 bg-blue-500 text-white rounded hover:bg-blue-700 transition-colors">
+    <select id="algorithmSelector" class="mb-4 px-3 py-2 bg-white border rounded shadow">
+        <option value="bubble">Bubble Sort</option>
+        <option value="selection">Selection Sort</option>
+        <option value="insertion">Insertion Sort</option>
+    </select>
+    
+    <button id="sortButton" class="px-6 py-2 bg-blue-500 text-white rounded hover:bg-blue-700 transition-colors">
         Sort
     </button>
 
     <script>
         let arr = Array.from({length: 30}, () => Math.floor(Math.random() * 100));
         const arrayContainer = document.getElementById('array');
+        const sortButton = document.getElementById('sortButton');
         displayArray(arr);
-
+    
+        const ws = new WebSocket('ws://' + window.location.host + '/ws');
+        let sortSteps = []; // To store all sorting steps sent by the server
+    
+        ws.onopen = function(event) {
+            sortButton.onclick = function() {
+                const algorithm = document.getElementById('algorithmSelector').value;
+                ws.send(JSON.stringify({ array: arr, algorithm: algorithm }));
+            };
+        };
+    
+        ws.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            if (Array.isArray(data)) {
+                // Assuming each message is a step in the sort process
+                sortSteps.push(data); // Store each step
+                if (sortSteps.length === 1) { // If it's the first step, start processing
+                    processSortSteps();
+                }
+            }
+        };
+    
+        function processSortSteps() {
+            if (sortSteps.length > 0) {
+                const step = sortSteps.shift(); // Get the next step
+                arr = step;
+                displayArray(arr); // Display the current step
+                setTimeout(processSortSteps, 500); // Wait 500ms before the next step
+            }
+        }
+    
         function displayArray(arr) {
             arrayContainer.innerHTML = '';
             arr.forEach(value => {
@@ -32,22 +69,7 @@
                 arrayContainer.appendChild(bar);
             });
         }
-
-        function startSort() {
-            fetch('/sort', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(arr),
-            })
-            .then(response => response.json())
-            .then(sortedArray => {
-                arr = sortedArray;
-                displayArray(arr);
-            })
-            .catch(error => console.error('Error:', error));
-        }
     </script>
+    
 </body>
 </html>
